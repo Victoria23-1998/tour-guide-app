@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="TourGuide.Api.Tests/TourGuide.Api.Tests.csproj" />
+  <Project Path="TourGuide.Api/TourGuide.Api.csproj" />
+</Solution>
