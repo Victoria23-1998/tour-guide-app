@@ -1,6 +1,15 @@
 @TourGuide.Api_HostAddress = http://localhost:5063
 
-GET {{TourGuide.Api_HostAddress}}/weatherforecast/
+### Nearby places around Puerta del Sol, Madrid
+GET {{TourGuide.Api_HostAddress}}/api/places/nearby?lat=40.4168&lon=-3.7038
+Accept: application/json
+
+### Nearby places with a custom radius (meters)
+GET {{TourGuide.Api_HostAddress}}/api/places/nearby?lat=40.4168&lon=-3.7038&radius=300
+Accept: application/json
+
+### Invalid latitude, returns 400
+GET {{TourGuide.Api_HostAddress}}/api/places/nearby?lat=100&lon=0
 Accept: application/json
 
 ###
