@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using TourGuide.Api.Cors;
 using TourGuide.Api.Places;
 using TourGuide.Api.Wikipedia;
 
@@ -13,6 +14,8 @@ builder.Services.AddOptions<WikipediaOptions>()
     .Bind(builder.Configuration.GetSection(WikipediaOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+
+builder.Services.AddFrontendCors(builder.Configuration);
 
 builder.Services.AddHttpClient<IWikipediaClient, WikipediaClient>((services, client) =>
 {
@@ -31,6 +34,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors();
 
 app.MapPlacesEndpoints();
 
