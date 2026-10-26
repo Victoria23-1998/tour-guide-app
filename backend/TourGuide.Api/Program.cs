@@ -8,8 +8,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-builder.Services.Configure<WikipediaOptions>(
-    builder.Configuration.GetSection(WikipediaOptions.SectionName));
+// ValidateOnStart: a bad "Wikipedia" config stops the app at startup, not on the first request.
+builder.Services.AddOptions<WikipediaOptions>()
+    .Bind(builder.Configuration.GetSection(WikipediaOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddHttpClient<IWikipediaClient, WikipediaClient>((services, client) =>
 {
