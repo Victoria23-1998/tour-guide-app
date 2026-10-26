@@ -13,7 +13,13 @@ An audio tour guide PWA: the phone sends GPS coordinates, the backend finds near
   - OpenAPI is served at `/openapi/v1.json` in Development.
   - Not built yet: EF Core, MySQL, CORS and the AI integration.
   - Tests live in [TourGuide.Api.Tests](backend/TourGuide.Api.Tests/) (xUnit + `WebApplicationFactory<Program>`).
-- **Frontend** ([frontend/](frontend/)): Angular **22** CLI scaffold, standalone components, signals, no NgModules. [app.html](frontend/src/app/app.html) is the default placeholder page, `routes` is empty. Tailwind CSS **v4** is wired through PostCSS ([.postcssrc.json](frontend/.postcssrc.json), `@import 'tailwindcss'` in [styles.css](frontend/src/styles.css)); there is no `tailwind.config.js`. PWA support (service worker/manifest) is not added yet.
+- **Frontend** ([frontend/](frontend/)): Angular **22**, standalone components, signals, no NgModules. `routes` is empty. Tailwind CSS **v4** is wired through PostCSS ([.postcssrc.json](frontend/.postcssrc.json), `@import 'tailwindcss'` in [styles.css](frontend/src/styles.css)); there is no `tailwind.config.js`. PWA support (service worker/manifest) is not added yet.
+  - [App](frontend/src/app/app.ts) is a full-screen map with a floating header and location status messages (locating, denied, unavailable, unsupported).
+  - [UserLocation](frontend/src/app/location/user-location.ts) wraps `navigator.geolocation.watchPosition` and exposes `position` and `status` signals.
+  - [TourMap](frontend/src/app/map/tour-map.ts) uses **MapLibre GL JS** with the OpenFreeMap `liberty` style (no API key). It follows the user and shows a re-center button after a drag.
+  - MapLibre is loaded with a dynamic `import()`, so it is a lazy chunk and not part of the initial bundle. Use only `import type` for it in other files.
+  - MapLibre's web worker is copied to `/maplibre/` by an `assets` entry in [angular.json](frontend/angular.json) and set with `setWorkerUrl`, because the bundler does not emit it. Its CSS is in the `styles` array.
+  - MapLibre's CSS is unlayered, so it beats Tailwind utilities (which are in a CSS layer). For example, it forces `position: relative` on the map container, so size that element with `size-full` and not `absolute inset-0`.
 
 ## Commands
 
@@ -39,6 +45,7 @@ Frontend (from `frontend`):
 ```powershell
 npm install
 npm start          # ng serve → http://localhost:4200
+npm run start:phone   # HTTPS on the LAN → https://<PC-IP>:4200 (phones allow geolocation only on HTTPS)
 npm run build      # production build (budgets: 500kB warn / 1MB error initial; 4kB/8kB per component style)
 npm test           # ng test → Vitest with jsdom
 npx ng test --include src/app/app.spec.ts   # single spec file
@@ -58,6 +65,6 @@ npx prettier --write .
   - Format numbers in URLs with `CultureInfo.InvariantCulture`. The dev machine uses the Spanish locale, which would turn decimal points into commas.
   - Wikipedia requires a descriptive `User-Agent`.
 - **Backend tests:** use a fake `HttpMessageHandler` for client tests and replace the interface in DI for endpoint tests. Tests never call the real network.
-- **Frontend tests:** Vitest globals (`describe`/`it`/`expect`) with Angular `TestBed`. [app.spec.ts](frontend/src/app/app.spec.ts) asserts the placeholder `<h1>` text ("Hello, frontend"), so update it when replacing the placeholder template.
+- **Frontend tests:** Vitest globals (`describe`/`it`/`expect`/`vi`) with Angular `TestBed`. jsdom has no WebGL or real geolocation: fake `navigator` with `vi.stubGlobal`, provide a fake `UserLocation`, and replace `TourMap` with a stub component (see [app.spec.ts](frontend/src/app/app.spec.ts)).
 - **Workflow:** one GitHub issue per feature, work on a branch, merge to `main` through small, focused pull requests.
 - The repo is developed on Windows. Use PowerShell syntax in docs.
