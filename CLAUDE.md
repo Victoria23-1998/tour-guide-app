@@ -11,7 +11,8 @@ An audio tour guide PWA: the phone sends GPS coordinates, the backend finds near
 - **Backend** ([backend/](backend/)): ASP.NET Core minimal API on **.NET 10**, solution [TourGuide.slnx](backend/TourGuide.slnx).
   - `GET /api/places/nearby?lat=&lon=&radius=` returns Wikipedia geosearch results sorted by distance. Invalid input returns 400 (ValidationProblem), and a Wikipedia failure or timeout returns 502.
   - OpenAPI is served at `/openapi/v1.json` in Development.
-  - Not built yet: EF Core, MySQL, CORS and the AI integration.
+  - CORS allows only the origins in `Cors:AllowedOrigins` (default `http://localhost:4200`), GET only. The setup is in [Cors/CorsExtensions.cs](backend/TourGuide.Api/Cors/CorsExtensions.cs). Origins must be `scheme://host[:port]` with no trailing slash, or the app does not start.
+  - Not built yet: EF Core, MySQL and the AI integration.
   - Tests live in [TourGuide.Api.Tests](backend/TourGuide.Api.Tests/) (xUnit + `WebApplicationFactory<Program>`).
 - **Frontend** ([frontend/](frontend/)): Angular **22**, standalone components, signals, no NgModules. `routes` is empty. Tailwind CSS **v4** is wired through PostCSS ([.postcssrc.json](frontend/.postcssrc.json), `@import 'tailwindcss'` in [styles.css](frontend/src/styles.css)); there is no `tailwind.config.js`. PWA support (service worker/manifest) is not added yet.
   - [App](frontend/src/app/app.ts) is a full-screen map with a floating header and location status messages (locating, denied, unavailable, unsupported).
