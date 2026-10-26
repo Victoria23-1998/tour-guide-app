@@ -52,6 +52,9 @@ npx prettier --write .
 - **Backend:** nullable reference types and implicit usings are enabled. Minimal API style.
   - Group code by feature folder: endpoints go in `Places/PlacesEndpoints.cs` as a `MapXxxEndpoints()` extension that `Program.cs` calls.
   - External APIs live in their own folder (`Wikipedia/`) as an interface plus a typed `HttpClient`, with settings bound from `appsettings.json` (`WikipediaOptions`).
+  - Options use DataAnnotations with `ValidateOnStart()`, so bad config stops the app at startup.
+  - Endpoints bind numeric query values as `string?` and parse them in `Validate`, so malformed input gets the same 400 ValidationProblem as out-of-range input. Use `double.IsFinite` to reject `NaN`/`Infinity`.
+  - Never log user coordinates. They are personal data.
   - Format numbers in URLs with `CultureInfo.InvariantCulture`. The dev machine uses the Spanish locale, which would turn decimal points into commas.
   - Wikipedia requires a descriptive `User-Agent`.
 - **Backend tests:** use a fake `HttpMessageHandler` for client tests and replace the interface in DI for endpoint tests. Tests never call the real network.

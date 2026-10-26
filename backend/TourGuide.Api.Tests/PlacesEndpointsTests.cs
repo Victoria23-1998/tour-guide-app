@@ -1,7 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using TourGuide.Api.Places;
 using TourGuide.Api.Wikipedia;
 
@@ -28,18 +31,53 @@ public class PlacesEndpointsTests(WebApplicationFactory<Program> factory)
     }
 
     [Theory]
-    [InlineData("/api/places/nearby?lon=-3.7038")]
-    [InlineData("/api/places/nearby?lat=100&lon=0")]
-    [InlineData("/api/places/nearby?lat=0&lon=-181")]
-    [InlineData("/api/places/nearby?lat=0&lon=0&radius=50000")]
-    [InlineData("/api/places/nearby?lat=0&lon=0&radius=5")]
-    public async Task Nearby_ReturnsBadRequest_ForInvalidInput(string url)
+    [InlineData("/api/places/nearby?lon=-3.7038", "lat")]
+    [InlineData("/api/places/nearby?lat=&lon=0", "lat")]
+    [InlineData("/api/places/nearby?lat=100&lon=0", "lat")]
+    [InlineData("/api/places/nearby?lat=0&lon=-181", "lon")]
+    [InlineData("/api/places/nearby?lat=NaN&lon=0", "lat")]
+    [InlineData("/api/places/nearby?lat=0&lon=Infinity", "lon")]
+    [InlineData("/api/places/nearby?lat=abc&lon=0", "lat")]
+    [InlineData("/api/places/nearby?lat=0&lon=0&radius=50000", "radius")]
+    [InlineData("/api/places/nearby?lat=0&lon=0&radius=5", "radius")]
+    [InlineData("/api/places/nearby?lat=0&lon=0&radius=1.5", "radius")]
+    [InlineData("/api/places/nearby?lat=0&lon=0&radius=99999999999", "radius")]
+    public async Task Nearby_ReturnsValidationProblem_ForInvalidInput(string url, string field)
     {
-        var client = CreateClient(new FakeWikipediaClient());
+        var fake = new FakeWikipediaClient();
+        var client = CreateClient(fake);
 
         var response = await client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<HttpValidationProblemDetails>();
+        Assert.Contains(field, problem!.Errors.Keys);
+        Assert.Null(fake.LastRadius); // Wikipedia was not called
+    }
+
+    [Fact]
+    public async Task Nearby_AcceptsCustomRadius()
+    {
+        var fake = new FakeWikipediaClient();
+        var client = CreateClient(fake);
+
+        var response = await client.GetAsync("/api/places/nearby?lat=40.4168&lon=-3.7038&radius=300");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(300, fake.LastRadius);
+    }
+
+    [Theory]
+    [InlineData("Wikipedia:BaseUrl", "")]
+    [InlineData("Wikipedia:BaseUrl", "not a url")]
+    [InlineData("Wikipedia:UserAgent", "")]
+    public void App_DoesNotStart_WithInvalidWikipediaConfig(string key, string value)
+    {
+        var badFactory = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, config) =>
+                config.AddInMemoryCollection(new Dictionary<string, string?> { [key] = value })));
+
+        Assert.Throws<OptionsValidationException>(() => badFactory.CreateClient());
     }
 
     [Fact]
