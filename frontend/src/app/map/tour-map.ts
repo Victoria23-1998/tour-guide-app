@@ -6,12 +6,21 @@ import {
   computed,
   effect,
   inject,
+  input,
+  output,
   signal,
   viewChild,
 } from '@angular/core';
-import type { GeoJSONSource, Map as MapLibreMap, Marker } from 'maplibre-gl';
+import type {
+  ExpressionSpecification,
+  GeoJSONSource,
+  Map as MapLibreMap,
+  MapMouseEvent,
+  Marker,
+} from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
 import { Position, UserLocation } from '../location/user-location';
+import { NearbyPlace } from '../places/nearby-place';
 
 /** OpenFreeMap vector style: free, no API key. Other options: `positron`, `bright`. */
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
@@ -20,6 +29,12 @@ const STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 const WORKER_URL = 'maplibre/maplibre-gl-worker.mjs';
 
 const ACCURACY_SOURCE = 'user-accuracy';
+const PLACES_LAYER = 'places';
+const PLACE_LABELS_LAYER = 'place-labels';
+/** Extra pixels around a tap, so the small place dots are easy to hit with a finger. */
+const TAP_TOLERANCE = 12;
+const PLACE_COLOR = '#f59e0b'; // Tailwind amber-500
+const SELECTED_COLOR = '#e11d48'; // Tailwind rose-600
 const STREET_ZOOM = 16;
 
 /**
@@ -32,6 +47,11 @@ const STREET_ZOOM = 16;
   host: { class: 'relative block size-full' },
 })
 export class TourMap {
+  readonly places = input<NearbyPlace[]>([]);
+  readonly selectedId = input<number | null>(null);
+  /** Emits the tapped place, or null when the user taps the map outside any place. */
+  readonly placeSelect = output<NearbyPlace | null>();
+
   private readonly location = inject(UserLocation);
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('map');
 
@@ -52,6 +72,27 @@ export class TourMap {
       const position = this.location.position();
       if (this.mapLoaded() && position) {
         this.showPosition(position);
+      }
+    });
+
+    effect(() => {
+      const places = this.places();
+      if (this.mapLoaded()) {
+        this.map!.getSource<GeoJSONSource>(PLACES_LAYER)?.setData(placeFeatures(places));
+      }
+    });
+
+    effect(() => {
+      const selectedId = this.selectedId();
+      if (this.mapLoaded()) {
+        const isSelected: ExpressionSpecification = ['==', ['get', 'pageId'], selectedId ?? -1];
+        this.map!.setPaintProperty(PLACES_LAYER, 'circle-radius', ['case', isSelected, 10, 7]);
+        this.map!.setPaintProperty(PLACES_LAYER, 'circle-color', [
+          'case',
+          isSelected,
+          SELECTED_COLOR,
+          PLACE_COLOR,
+        ]);
       }
     });
 
@@ -104,8 +145,10 @@ export class TourMap {
         source: ACCURACY_SOURCE,
         paint: { 'fill-color': '#0ea5e9', 'fill-opacity': 0.15 },
       });
+      addPlaceLayers(map);
       this.mapLoaded.set(true);
     });
+    map.on('click', (event) => this.selectPlaceAt(event));
     // Only a drag by the user (not our own camera animations) stops following.
     map.on('dragstart', (event) => {
       if (event.originalEvent) {
@@ -114,6 +157,19 @@ export class TourMap {
     });
 
     this.marker = new maplibre.Marker({ element: createMarkerElement() });
+  }
+
+  private selectPlaceAt(event: MapMouseEvent): void {
+    const { x, y } = event.point;
+    const [feature] = this.map!.queryRenderedFeatures(
+      [
+        [x - TAP_TOLERANCE, y - TAP_TOLERANCE],
+        [x + TAP_TOLERANCE, y + TAP_TOLERANCE],
+      ],
+      { layers: [PLACES_LAYER, PLACE_LABELS_LAYER] },
+    );
+    const pageId = feature?.properties['pageId'];
+    this.placeSelect.emit(this.places().find((place) => place.pageId === pageId) ?? null);
   }
 
   private showPosition(position: Position): void {
@@ -145,6 +201,52 @@ function createMarkerElement(): HTMLElement {
     <span class="relative block size-5 rounded-full border-[3px] border-white bg-sky-500 shadow-lg shadow-sky-900/40"></span>
   `;
   return element;
+}
+
+/** Amber dots with the place name under them; one GeoJSON source feeds both layers. */
+function addPlaceLayers(map: MapLibreMap): void {
+  map.addSource(PLACES_LAYER, { type: 'geojson', data: emptyFeatures() });
+  map.addLayer({
+    id: PLACES_LAYER,
+    type: 'circle',
+    source: PLACES_LAYER,
+    paint: {
+      'circle-radius': 7,
+      'circle-color': PLACE_COLOR,
+      'circle-stroke-width': 2.5,
+      'circle-stroke-color': '#ffffff',
+    },
+  });
+  map.addLayer({
+    id: PLACE_LABELS_LAYER,
+    type: 'symbol',
+    source: PLACES_LAYER,
+    layout: {
+      'text-field': ['get', 'title'],
+      'text-font': ['Noto Sans Bold'], // must be a font the OpenFreeMap style serves
+      'text-size': 12,
+      'text-anchor': 'top',
+      'text-offset': [0, 0.9],
+      'text-max-width': 9,
+    },
+    paint: { 'text-color': '#1e293b', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
+  });
+
+  for (const layer of [PLACES_LAYER, PLACE_LABELS_LAYER]) {
+    map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
+    map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
+  }
+}
+
+function placeFeatures(places: NearbyPlace[]): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: places.map((place) => ({
+      type: 'Feature',
+      properties: { pageId: place.pageId, title: place.title },
+      geometry: { type: 'Point', coordinates: [place.lon, place.lat] },
+    })),
+  };
 }
 
 function emptyFeatures(): FeatureCollection {
