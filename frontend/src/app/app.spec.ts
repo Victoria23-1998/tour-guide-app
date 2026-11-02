@@ -145,4 +145,33 @@ describe('App', () => {
     await fixture.whenStable();
     expect(map.selectedId()).toBeNull();
   });
+
+  it('switches to kilometers when the rounded distance reaches 1000 m', async () => {
+    location.position.set({ lat: 40.4169 + 0.00896, lon: -3.7035, accuracy: 10 }); // about 996 m north
+    nearby.places.set([sol]);
+    const fixture = await render('tracking', 'ready');
+    fixture.debugElement.query(By.directive(FakeTourMap)).componentInstance.placeSelect.emit(sol);
+    await fixture.whenStable();
+
+    const card = (fixture.nativeElement as HTMLElement).querySelector(
+      '[aria-label="Selected place"]',
+    );
+    expect(card?.textContent).toContain('1.0 km away');
+  });
+
+  it('closes the card when a new search no longer returns the place', async () => {
+    nearby.places.set([sol]);
+    const fixture = await render('tracking', 'ready');
+    const map = fixture.debugElement.query(By.directive(FakeTourMap))
+      .componentInstance as FakeTourMap;
+    map.placeSelect.emit(sol);
+    await fixture.whenStable();
+
+    nearby.places.set([{ ...sol, pageId: 7, title: 'Plaza Mayor' }]);
+    await fixture.whenStable();
+
+    const page = fixture.nativeElement as HTMLElement;
+    expect(page.querySelector('[aria-label="Selected place"]')).toBeNull();
+    expect(map.selectedId()).toBeNull();
+  });
 });

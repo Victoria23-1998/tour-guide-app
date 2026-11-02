@@ -160,16 +160,35 @@ export class TourMap {
   }
 
   private selectPlaceAt(event: MapMouseEvent): void {
+    // The place layers are added on 'load'; querying them earlier is an error.
+    if (!this.mapLoaded()) {
+      return;
+    }
+    const map = this.map!;
     const { x, y } = event.point;
-    const [feature] = this.map!.queryRenderedFeatures(
-      [
-        [x - TAP_TOLERANCE, y - TAP_TOLERANCE],
-        [x + TAP_TOLERANCE, y + TAP_TOLERANCE],
-      ],
-      { layers: [PLACES_LAYER, PLACE_LABELS_LAYER] },
+    const hitIds = new Set(
+      map
+        .queryRenderedFeatures(
+          [
+            [x - TAP_TOLERANCE, y - TAP_TOLERANCE],
+            [x + TAP_TOLERANCE, y + TAP_TOLERANCE],
+          ],
+          { layers: [PLACES_LAYER, PLACE_LABELS_LAYER] },
+        )
+        .map((feature) => feature.properties['pageId']),
     );
-    const pageId = feature?.properties['pageId'];
-    this.placeSelect.emit(this.places().find((place) => place.pageId === pageId) ?? null);
+
+    // Several places can be in the tap box (e.g. a neighbor's label), so pick the dot nearest the tap.
+    let nearest: NearbyPlace | null = null;
+    let nearestDistance = Infinity;
+    for (const place of this.places().filter((p) => hitIds.has(p.pageId))) {
+      const distance = map.project([place.lon, place.lat]).dist(event.point);
+      if (distance < nearestDistance) {
+        nearest = place;
+        nearestDistance = distance;
+      }
+    }
+    this.placeSelect.emit(nearest);
   }
 
   private showPosition(position: Position): void {
@@ -232,10 +251,10 @@ function addPlaceLayers(map: MapLibreMap): void {
     paint: { 'text-color': '#1e293b', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
   });
 
-  for (const layer of [PLACES_LAYER, PLACE_LABELS_LAYER]) {
-    map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'));
-    map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
-  }
+  // One handler for both layers, so moving from a label to its dot doesn't reset the cursor.
+  const clickable = [PLACES_LAYER, PLACE_LABELS_LAYER];
+  map.on('mouseenter', clickable, () => (map.getCanvas().style.cursor = 'pointer'));
+  map.on('mouseleave', clickable, () => (map.getCanvas().style.cursor = ''));
 }
 
 function placeFeatures(places: NearbyPlace[]): FeatureCollection {

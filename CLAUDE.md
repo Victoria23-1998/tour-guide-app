@@ -12,6 +12,7 @@ An audio tour guide PWA: the phone sends GPS coordinates, the backend finds near
   - `GET /api/places/nearby?lat=&lon=&radius=` returns Wikipedia geosearch results sorted by distance. Invalid input returns 400 (ValidationProblem), and a Wikipedia failure or timeout returns 502.
   - OpenAPI is served at `/openapi/v1.json` in Development.
   - CORS allows only the origins in `Cors:AllowedOrigins` (default `http://localhost:4200`), GET only. The setup is in [Cors/CorsExtensions.cs](backend/TourGuide.Api/Cors/CorsExtensions.cs). Origins must be `scheme://host[:port]` with no trailing slash, or the app does not start.
+  - `UseHttpsRedirection()` runs only outside Development. In Development, a redirect to `https://localhost:7072` would reach the browser through the Angular dev proxy and break it.
   - Not built yet: EF Core, MySQL and the AI integration.
   - Tests live in [TourGuide.Api.Tests](backend/TourGuide.Api.Tests/) (xUnit + `WebApplicationFactory<Program>`).
 - **Frontend** ([frontend/](frontend/)): Angular **22**, standalone components, signals, no NgModules. `routes` is empty. Tailwind CSS **v4** is wired through PostCSS ([.postcssrc.json](frontend/.postcssrc.json), `@import 'tailwindcss'` in [styles.css](frontend/src/styles.css)); there is no `tailwind.config.js`. PWA support (service worker/manifest) is not added yet.

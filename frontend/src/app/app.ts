@@ -40,7 +40,11 @@ export class App {
   protected readonly nearby = inject(NearbyPlaces);
   protected readonly problem = computed(() => PROBLEMS[this.location.status()] ?? null);
 
-  protected readonly selected = signal<NearbyPlace | null>(null);
+  protected readonly selectedId = signal<number | null>(null);
+  /** Looked up in the current list, so the card closes when a new search no longer returns the place. */
+  protected readonly selected = computed(
+    () => this.nearby.places().find((place) => place.pageId === this.selectedId()) ?? null,
+  );
   /** Live distance to the selected place; the API's distance gets stale while the user walks. */
   protected readonly selectedDistance = computed(() => {
     const place = this.selected();
@@ -58,7 +62,7 @@ export class App {
 }
 
 function formatDistance(meters: number): string {
-  return meters < 1000
-    ? `${Math.round(meters / 10) * 10} m away`
-    : `${(meters / 1000).toFixed(1)} km away`;
+  // Round before choosing the unit, so 996 m reads "1.0 km away", not "1000 m away".
+  const rounded = Math.round(meters / 10) * 10;
+  return rounded < 1000 ? `${rounded} m away` : `${(meters / 1000).toFixed(1)} km away`;
 }

@@ -2,7 +2,7 @@
   <app-tour-map
     [places]="nearby.places()"
     [selectedId]="selected()?.pageId ?? null"
-    (placeSelect)="selected.set($event)"
+    (placeSelect)="selectedId.set($event?.pageId ?? null)"
   />
 
   <header
@@ -58,7 +58,7 @@
       >
         <button
           type="button"
-          (click)="selected.set(null)"
+          (click)="selectedId.set(null)"
           aria-label="Close"
           class="absolute top-3 right-3 flex size-8 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
         >
