@@ -32,8 +32,12 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-
-app.UseHttpsRedirection();
+else
+{
+    // Not in Development: the Angular dev proxy calls http://localhost:5063, and a redirect to
+    // https://localhost:7072 would reach the browser (on a phone, "localhost" is the phone itself).
+    app.UseHttpsRedirection();
+}
 
 app.UseCors();
 
